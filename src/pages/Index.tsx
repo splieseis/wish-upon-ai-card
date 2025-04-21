@@ -93,25 +93,33 @@ const Index = () => {
         <EcardEmail imageUrl={generatedImage} message={personalMessage.replace(/</g, "&lt;").replace(/>/g, "&gt;")} />
       );
 
-      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-ecard`, {
+      // Use the correct Supabase URL from the client configuration
+      const SUPABASE_URL = "https://brkuujubpgctyrdizysu.supabase.co";
+      
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/send-ecard`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+          apikey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJya3V1anVicGdjdHlyZGl6eXN1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDUyMTIzMjcsImV4cCI6MjA2MDc4ODMyN30.1oBKMiXzRk163ZbjvVWzoYStIi6S7Apvu7Ulv_5guiQ",
         },
         body: JSON.stringify({
           html,
           recipient_email: recipientEmail,
         }),
       });
-      const out = await res.json();
+      
       if (!res.ok) {
-        throw new Error(out?.error || "Failed to send email");
+        const errorData = await res.text();
+        console.error("API Error Response:", errorData);
+        throw new Error(`Failed to send email: ${res.status} ${res.statusText}`);
       }
+      
+      const out = await res.json();
       setStep("complete");
       setSuccessMsg(`✅ eCard sent to ${recipientEmail}!`);
       toast({ title: "Success", description: `eCard sent to ${recipientEmail}!` });
     } catch (error: any) {
+      console.error("Send email error:", error);
       setGlobalError(error?.message || "Error sending eCard");
       setStep("idle");
       toast({ variant: "destructive", title: "Error", description: error?.message || "Error occurred" });
