@@ -7,7 +7,8 @@ import {
   Img,
   Preview,
   Text,
-} from "npm:@react-email/components@0.0.22";
+  renderAsync
+} from "@react-email/components";
 import * as React from "react";
 
 // Utility function to sanitize input to plain text (escape HTML entities)
@@ -86,7 +87,6 @@ const footer = {
 };
 
 // Utility to render the template to an HTML string (callable from elsewhere)
-import { renderAsync } from "npm:@react-email/components@0.0.22";
 export async function renderEcardEmailHtml(imageUrl: string, message: string) {
   // Always sanitize message
   return await renderAsync(
