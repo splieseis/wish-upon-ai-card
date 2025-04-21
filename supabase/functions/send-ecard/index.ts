@@ -47,7 +47,7 @@ serve(async (req: Request) => {
     const emailResult = await resend.emails.send({
       from: "onboarding@resend.dev",
       to: [recipient_email],
-      subject: "You’ve received an eCard!",
+      subject: "You've received an eCard!",
       html: html,
     });
 

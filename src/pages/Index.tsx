@@ -96,11 +96,12 @@ const Index = () => {
       // Use the correct Supabase URL from the client configuration
       const SUPABASE_URL = "https://brkuujubpgctyrdizysu.supabase.co";
       
+      // Make sure we're using the correct endpoint
       const res = await fetch(`${SUPABASE_URL}/functions/v1/send-ecard`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          apikey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJya3V1anVicGdjdHlyZGl6eXN1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDUyMTIzMjcsImV4cCI6MjA2MDc4ODMyN30.1oBKMiXzRk163ZbjvVWzoYStIi6S7Apvu7Ulv_5guiQ",
+          // No authorization header needed since we made the function public
         },
         body: JSON.stringify({
           html,

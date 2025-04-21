@@ -5,4 +5,4 @@ project_id = "brkuujubpgctyrdizysu"
 verify_jwt = true
 
 [functions.send-ecard]
-verify_jwt = true
+verify_jwt = false
