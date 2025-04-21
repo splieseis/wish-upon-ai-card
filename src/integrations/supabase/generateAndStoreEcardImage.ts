@@ -1,17 +1,21 @@
 
+import { supabase } from "./supabaseClient";
 import { generateImage } from "./generateImage";
 import { uploadEcardImage } from "./uploadEcardImage";
 
 /**
- * Generates an image using Replicate (via Supabase edge function),
- * fetches the image as a Blob, and uploads it to Supabase Storage.
- * Returns the public Supabase Storage URL.
- * 
+ * Generates an image, uploads to Supabase Storage, and saves the record in ecards.
  * @param prompt The prompt for the AI image generator.
+ * @param message The personal message to be saved with the eCard.
+ * @param recipientEmail The recipient's email address.
  * @returns Promise<string> - Public URL of the uploaded image in Supabase storage.
- * @throws If image generation or upload fails.
+ * @throws If image generation, upload, or database insertion fails.
  */
-export async function generateAndStoreEcardImage(prompt: string): Promise<string> {
+export async function generateAndStoreEcardImage(
+  prompt: string,
+  message: string,
+  recipientEmail: string
+): Promise<string> {
   // Step 1: Generate image via Replicate through the edge function
   let imageUrl: string;
   try {
@@ -50,9 +54,29 @@ export async function generateAndStoreEcardImage(prompt: string): Promise<string
       throw new Error("No public URL returned after upload.");
     }
     console.log("Supabase storage public URL:", storageUrl);
-    return storageUrl;
   } catch (error: any) {
     console.error("Error uploading image to Supabase Storage:", error);
     throw new Error(`Failed to upload image to storage: ${error.message || error}`);
   }
+
+  // Step 4: Insert a row in the ecards table
+  try {
+    const { error } = await supabase.from("ecards").insert({
+      image_url: storageUrl,
+      message: message,
+      recipient_email: recipientEmail,
+    });
+    if (error) {
+      throw new Error(error.message);
+    }
+    console.log(
+      "Inserted record into ecards table with image_url, message, and recipient_email"
+    );
+  } catch (error: any) {
+    console.error("Error inserting record into ecards table:", error);
+    throw new Error(`Failed to save eCard data: ${error.message || error}`);
+  }
+
+  // Finally, return the public image URL
+  return storageUrl;
 }
