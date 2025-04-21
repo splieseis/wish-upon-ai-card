@@ -3,3 +3,6 @@ project_id = "brkuujubpgctyrdizysu"
 
 [functions.generate-image]
 verify_jwt = true
+
+[functions.send-ecard]
+verify_jwt = true
