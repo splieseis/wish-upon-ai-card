@@ -15,12 +15,15 @@ import { EcardEmail } from "@/email/EcardEmail";
 
 const LOCALSTORAGE_IMAGE_KEY = "lastGeneratedEcardImageUrl";
 
+// Define the step type as a single type with all possible values
+type Step = "idle" | "generating" | "uploading" | "saving" | "sending" | "complete";
+
 const Index = () => {
   const [imagePrompt, setImagePrompt] = useState("");
   const [personalMessage, setPersonalMessage] = useState("");
   const [recipientEmail, setRecipientEmail] = useState("");
   const [generatedImage, setGeneratedImage] = useState("");
-  const [step, setStep] = useState<"idle" | "generating" | "uploading" | "saving" | "sending" | "complete">("idle");
+  const [step, setStep] = useState<Step>("idle");
   const [fieldError, setFieldError] = useState<{prompt?: string; message?: string; email?: string}>({});
   const [globalError, setGlobalError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -289,4 +292,3 @@ const Index = () => {
 };
 
 export default Index;
-
