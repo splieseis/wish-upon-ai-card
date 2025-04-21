@@ -14,7 +14,7 @@ import { supabase } from "@/integrations/supabase/supabaseClient";
 
 // For rendering the email template to HTML
 import { render } from "@react-email/render";
-import EcardEmail from "@/email/EcardEmail";
+import { EcardEmail } from "@/email/EcardEmail"; // Changed from default to named import
 
 const Index = () => {
   const [imagePrompt, setImagePrompt] = useState("");
@@ -70,12 +70,12 @@ const Index = () => {
       );
 
       // Call Supabase Edge Function to send email
-      const res = await fetch(`${supabase.functions._functionsUrl}/send-ecard`, {
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-ecard`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           // If Supabase JWT is needed: "Authorization": `Bearer ${supabase.auth.session()?.access_token}`,
-          apikey: supabase.supabaseKey,
+          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
         },
         body: JSON.stringify({
           html,
