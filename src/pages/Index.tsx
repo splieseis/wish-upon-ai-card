@@ -220,7 +220,7 @@ const Index = () => {
                 <Button
                   className="w-1/2 bg-purple-600 hover:bg-purple-700"
                   onClick={handleGenerateEcard}
-                  disabled={!canGenerate || step === "generating"}
+                  disabled={!canGenerate}
                   type="button"
                 >
                   {step === "generating" ? (
@@ -239,7 +239,7 @@ const Index = () => {
               <Button
                 className="w-full bg-green-600 hover:bg-green-700 mt-2"
                 onClick={handleSendEmail}
-                disabled={!canSend || step === "sending"}
+                disabled={!canSend}
                 type="button"
               >
                 {step === "sending" ? (
