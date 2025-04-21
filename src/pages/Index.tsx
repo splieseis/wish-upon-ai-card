@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -8,13 +8,12 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Send, Image } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-
 import { generateAndStoreEcardImage } from "@/integrations/supabase/generateAndStoreEcardImage";
 import { supabase } from "@/integrations/supabase/supabaseClient";
-
-// For rendering the email template to HTML
 import { render } from "@react-email/render";
-import { EcardEmail } from "@/email/EcardEmail"; // Changed from default to named import
+import { EcardEmail } from "@/email/EcardEmail";
+
+const LOCALSTORAGE_IMAGE_KEY = "lastGeneratedEcardImageUrl";
 
 const Index = () => {
   const [imagePrompt, setImagePrompt] = useState("");
@@ -28,7 +27,21 @@ const Index = () => {
 
   const { toast } = useToast();
 
-  // Input validation
+  // Restore last image after reload, if present
+  useEffect(() => {
+    const last = localStorage.getItem(LOCALSTORAGE_IMAGE_KEY);
+    if (last) {
+      setGeneratedImage(last);
+    }
+  }, []);
+
+  // Save generated image URL to localStorage
+  useEffect(() => {
+    if (generatedImage) {
+      localStorage.setItem(LOCALSTORAGE_IMAGE_KEY, generatedImage);
+    }
+  }, [generatedImage]);
+
   const validate = () => {
     const errors: typeof fieldError = {};
     if (!imagePrompt) errors.prompt = "Image prompt required";
@@ -37,7 +50,6 @@ const Index = () => {
     return errors;
   };
 
-  // Step 1–4: Full eCard workflow
   const handleGenerateEcard = async () => {
     setStep("idle");
     setFieldError({});
@@ -49,32 +61,39 @@ const Index = () => {
       setFieldError(errors);
       return;
     }
-
     setStep("generating");
-    setGeneratedImage(""); // Remove preview while new image loads
+    setGeneratedImage(""); // Remove preview while loading new image
 
     let publicImageUrl = "";
     try {
-      // Will do all: generate image, upload, save metadata
       publicImageUrl = await generateAndStoreEcardImage(imagePrompt, personalMessage, recipientEmail);
       setGeneratedImage(publicImageUrl);
+      // Save to localStorage handled in useEffect
       setStep("saving");
       toast({ title: "Image saved", description: "eCard image and details stored." });
-      // Step: send the email
-      setStep("sending");
+      setStep("idle");
+    } catch (error: any) {
+      setGlobalError(error?.message || "Error generating/sending eCard");
+      setStep("idle");
+      toast({ variant: "destructive", title: "Error", description: error?.message || "Error occurred" });
+    }
+  };
 
-      // 🛡️ Sanitize: treat message as plain text for the email template.
-      // Only pass trusted content to "html"
+  // Send email, separated for proper loading state
+  const handleSendEmail = async () => {
+    setStep("sending");
+    setGlobalError(null);
+    setSuccessMsg(null);
+
+    try {
       const html = render(
-        <EcardEmail imageUrl={publicImageUrl} message={personalMessage.replace(/</g, "&lt;").replace(/>/g, "&gt;")} />
+        <EcardEmail imageUrl={generatedImage} message={personalMessage.replace(/</g, "&lt;").replace(/>/g, "&gt;")} />
       );
 
-      // Call Supabase Edge Function to send email
       const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-ecard`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          // If Supabase JWT is needed: "Authorization": `Bearer ${supabase.auth.session()?.access_token}`,
           apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
         },
         body: JSON.stringify({
@@ -86,18 +105,16 @@ const Index = () => {
       if (!res.ok) {
         throw new Error(out?.error || "Failed to send email");
       }
-
       setStep("complete");
-      setSuccessMsg(`eCard sent to ${recipientEmail}!`);
+      setSuccessMsg(`✅ eCard sent to ${recipientEmail}!`);
       toast({ title: "Success", description: `eCard sent to ${recipientEmail}!` });
     } catch (error: any) {
-      setGlobalError(error?.message || "Error generating/sending eCard");
+      setGlobalError(error?.message || "Error sending eCard");
       setStep("idle");
       toast({ variant: "destructive", title: "Error", description: error?.message || "Error occurred" });
     }
   };
 
-  // Reset UI for another eCard
   const handleReset = () => {
     setStep("idle");
     setGeneratedImage("");
@@ -107,12 +124,14 @@ const Index = () => {
     setGlobalError(null);
     setFieldError({});
     setSuccessMsg(null);
+    localStorage.removeItem(LOCALSTORAGE_IMAGE_KEY);
   };
 
-  const buttonDisabled =
-    !!fieldError.prompt || !!fieldError.message || !!fieldError.email ||
-    !imagePrompt || !personalMessage || !recipientEmail ||
-    step === "generating" || step === "uploading" || step === "saving" || step === "sending";
+  // Refined disabling logic: disable GENERATE if missing fields, SEND if missing image/message
+  const canGenerate =
+    !!imagePrompt && !!personalMessage && !!recipientEmail && step === "idle";
+  const canSend =
+    !!generatedImage && !!personalMessage && !!recipientEmail && step === "idle";
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-purple-50 to-white p-4 md:p-8">
@@ -138,7 +157,9 @@ const Index = () => {
                   onChange={(e) => setImagePrompt(e.target.value)}
                   disabled={step !== "idle"}
                 />
-                {fieldError.prompt && <p className="text-sm text-red-500">{fieldError.prompt}</p>}
+                {fieldError.prompt && (
+                  <p className="text-sm font-medium text-red-700 bg-red-100 rounded px-2 py-1">{fieldError.prompt}</p>
+                )}
                 <p className="text-xs text-gray-500">Describe the image you want to generate</p>
               </div>
 
@@ -152,7 +173,9 @@ const Index = () => {
                   onChange={(e) => setPersonalMessage(e.target.value)}
                   disabled={step !== "idle"}
                 />
-                {fieldError.message && <p className="text-sm text-red-500">{fieldError.message}</p>}
+                {fieldError.message && (
+                  <p className="text-sm font-medium text-red-700 bg-red-100 rounded px-2 py-1">{fieldError.message}</p>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -165,47 +188,62 @@ const Index = () => {
                   onChange={(e) => setRecipientEmail(e.target.value)}
                   disabled={step !== "idle"}
                 />
-                {fieldError.email && <p className="text-sm text-red-500">{fieldError.email}</p>}
+                {fieldError.email && (
+                  <p className="text-sm font-medium text-red-700 bg-red-100 rounded px-2 py-1">{fieldError.email}</p>
+                )}
               </div>
               {globalError && (
-                <div className="bg-red-100 text-red-600 rounded-md px-3 py-2 mt-2">
+                <div className="bg-red-200 border border-red-500 text-red-900 font-bold text-center rounded-md px-3 py-2 mt-2 animate-pulse">
                   {globalError}
                 </div>
               )}
               {successMsg && (
-                <div className="bg-green-100 text-green-600 rounded-md px-3 py-2 mt-2">
+                <div className="bg-green-200 border border-green-500 text-green-900 font-bold text-center rounded-md px-3 py-2 mt-2 animate-fade-in">
                   {successMsg}
                 </div>
               )}
             </CardContent>
-            <CardFooter className="flex gap-2">
-              {step !== "idle" && (
-                <Button onClick={handleReset} variant="secondary" className="w-1/2">
+            <CardFooter className="flex flex-col gap-2">
+              <div className="flex gap-2 w-full">
+                <Button
+                  onClick={handleReset}
+                  variant="secondary"
+                  className="w-1/2"
+                  disabled={step !== "idle" && step !== "complete"}
+                  type="button"
+                >
                   Reset
                 </Button>
-              )}
+                <Button
+                  className="w-1/2 bg-purple-600 hover:bg-purple-700"
+                  onClick={handleGenerateEcard}
+                  disabled={!canGenerate || step === "generating"}
+                  type="button"
+                >
+                  {step === "generating" ? (
+                    <>
+                      <Image className="mr-2 h-4 w-4 animate-spin" /> Generating...
+                    </>
+                  ) : (
+                    <>
+                      <Image className="mr-2 h-4 w-4" />
+                      Generate Image
+                    </>
+                  )}
+                </Button>
+              </div>
+              {/* Send eCard as separate button for clearer intent and loading */}
               <Button
-                className="w-full bg-purple-600 hover:bg-purple-700"
-                onClick={handleGenerateEcard}
-                disabled={buttonDisabled}
+                className="w-full bg-green-600 hover:bg-green-700 mt-2"
+                onClick={handleSendEmail}
+                disabled={!canSend || step === "sending"}
+                type="button"
               >
-                {step === "generating" && (
+                {step === "sending" ? (
                   <>
-                    <Image className="mr-2 h-4 w-4 animate-spin" />Generating...
+                    <Send className="mr-2 h-4 w-4 animate-spin" /> Sending eCard...
                   </>
-                )}
-                {step === "saving" && (
-                  <>
-                    <Image className="mr-2 h-4 w-4 animate-spin" />Saving...
-                  </>
-                )}
-                {step === "sending" && (
-                  <>
-                    <Send className="mr-2 h-4 w-4 animate-spin" />Sending...
-                  </>
-                )}
-                {step === "complete" && "Sent"}
-                {step === "idle" && (
+                ) : (
                   <>
                     <Send className="mr-2 h-4 w-4" />
                     Send eCard
@@ -251,3 +289,4 @@ const Index = () => {
 };
 
 export default Index;
+
